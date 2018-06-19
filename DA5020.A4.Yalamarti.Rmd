@@ -1,0 +1,102 @@
+---
+title: "R Notebook"
+output:
+  word_document: default
+  pdf_document: default
+  html_notebook: default
+---
+1. Load the data into an appropriate data object of your choice (data frame or tibble). Note that the data file is compressed so you need to determine and appropriate way to uncompress the file as you read it (do not uncompress the file in your operating system). See the resources below to view an article that explains various ways to read compressed files.
+```{r}
+#Setting the directory
+setwd("C:/Users/prith/OneDrive/Desktop/Assignment 4")
+getwd()
+#Unzipping the file
+file <- unzip("bird_strikes.zip")
+#Reading the file and placing it in 'data'
+data <- read.csv(file, stringsAsFactors = F)
+#data <-read.table(unz("bird_strikes.zip", "Bird Strikes.csv"), header=T, quote="\"", sep=",", fill =T, stringsAsFactors =F)
+#Loading the tidyverse package
+library(tidyverse)
+#Checking top 10 rows
+head(data, n=10)
+```
+2.  Write a function called strikesByYear() that returns a dataframe containing for each year the number of bird strike incidents.
+```{r}
+#Checking the type of FlightDate. Whether it is numeric or character 
+#class(data1$FlightDate)
+#data1 <- data
+#data1$FlightDate <- as.Date(data1$FlightDate, "%m/%d/%Y")
+#Loading the 'lubridate' function
+library(lubridate)
+#Creating a function named strikesByYear()
+strikesByYear <- function(d){
+#Converting the Flightdate in the format date(month, day and year)  
+d$FlightDate <- as.Date(d$FlightDate, "%m/%d/%Y")
+#Representing it by year, month and day
+ymd(d$FlightDate)
+#Taking only the year
+d$FlightDate <- year(d$FlightDate)
+#Using pipes we find the number of bird strikes in each year
+#Selecting only the year and birdstrikes
+x <- select(d, FlightDate) %>% 
+#Grouping by FlightDate
+group_by(FlightDate) %>%
+#n() inside summarise is used to count and it is put in Bird_Strikes
+summarise(Bird_Strikes = n())
+#Returning the value
+return (x)
+} 
+
+#Calling the function and passing Data in it
+strikesByYear(data)
+```
+
+3. Write a function called leastStrikesInaYear() that returns the year which had the least bird strike incidents.
+```{r}
+#Creating a function named leastStrikesInaYear
+leastStrikesInaYear <- function(data2){
+#Converting the Flightdate in the format date(month, day and year)  
+data2$FlightDate <- as.Date(data2$FlightDate, "%m/%d/%Y")
+#Representing it by year, month and day
+ymd(data2$FlightDate)
+#Taking only the year
+data2$FlightDate <- year(data2$FlightDate)
+#Selecting the year and birdstrikes
+x <- select(data2, FlightDate) %>%
+#Using group_by to group them by the flightdate  
+group_by(FlightDate) %>%
+#n() inside summarise is used to count and it is put in Bird_Strikes
+summarise(Bird_Strikes = n()) %>%
+#Filer function is used to find the minimum value or the least value and it is saved in Bird_Strikes
+filter(Bird_Strikes==min(Bird_Strikes))
+#Returning the value
+return (x)
+}
+
+#Calling the function and passing the data in it   
+leastStrikesInaYear(data)
+
+```
+
+4. Write a function called strikesByType() that returns the number of birds strike incidents per type of wildlife (excluding unkown) in a dataframe. Store the return result in a dataframe called Strikes.
+
+```{r}
+#sum(is.na(data$Wildlife..Species)) - Checking if there are any NA values in the 'Wildlife..Species' column
+
+#Creating a function named StrikesByType
+strikesByType <- function(Strikes){
+#str_detect(data$Wildlife..Species,"Unknown")
+#Selecting the Wildlife..Species and BirdStrikes. Pipe operation is used  
+x <- select(Strikes, Wildlife..Species) %>% 
+#Using the group by statement and grouping by Wildlife..Species 
+group_by(Wildlife..Species) %>%
+#Using the filter statement and making sure no Unknown species are included and no NULL or "" species are included.  
+filter(!(str_detect(Wildlife..Species,"Unknown") | Wildlife..Species=="")) %>% 
+#n() inside summarise is used to count and it is put in Bird_Strikes
+summarise(Bird_Strikes = n()) 
+#Returning the value
+return(x)
+}
+#Calling the function and passing the data in it
+strikesByType(data)
+```

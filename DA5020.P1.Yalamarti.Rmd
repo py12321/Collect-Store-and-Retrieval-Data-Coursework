@@ -1,0 +1,295 @@
+---
+title: "Practicum 1"
+output:
+  pdf_document: default
+  word_document: default
+  html_notebook: default
+---
+1. Download the PubMed excerpt data set (XML).  Load the XML file into a browser or text editing tool and inspect it. Explore the data set as you see fit and that allows you to get a sense of the data and get comfortable with it.
+2. Load the data into R and create two linked tibbles: one for publication and one for journal. Use ISSN as the key to link them. Only load the following information into the publication tibble: PMID (primary key for publication), ISSN and publication year (foreign key for journal), date completed (as one date field), date revised (as one date field), number of authors (derived/calculated field from the authors), publication type, title of article. Load this information into the journal tibble: ISSN (primary key), medium (from CitedMedium attribute), publication year (primary key), publication season, language, and journal title. In cases where there are multiple languages for a publication, pick the first language. Same for publication type: pick the first one. The primary key for journal is (ISSN, publication year). Also, exclude any journals that do not have an ISSN as the primary key cannot be empty.
+```{r}
+#Loading the libraries
+library(XML)
+library(RCurl)
+library(plyr)
+```
+
+```{r}
+#XML URL link to a variable named URL
+URL <- "https://da5020.weebly.com/uploads/8/6/5/9/8659576/pubmedsample.jun18.xml"
+#Using a getURL function, we get the data from URL and store it in Data
+data <- getURL(URL)
+
+#xmlParse function 
+pubmed1 <- xmlParse(data)
+
+#xmlRoot function is used to get the top-level XML Node
+pubmed <- xmlRoot(pubmed1)
+
+```
+
+```{r}
+#PART 1
+ISSN <- xpathSApply(pubmed, "//PubmedArticle/MedlineCitation", function(x) {
+  if (xpathSApply(x, "boolean(./Article/Journal/ISSN)")) {
+    xpathSApply(x, "./Article/Journal/ISSN", xmlValue)
+  } else {
+    NA
+  }
+})
+
+PMID <- xpathSApply(pubmed, '//PubmedArticle/MedlineCitation/PMID', xmlValue, simplify = TRUE)
+
+PublicationType <- xpathSApply(pubmed, "//PubmedArticle/MedlineCitation", function(x) {
+  if (xpathSApply(x, "boolean(./Article/PublicationTypeList/PublicationType)")) {
+    xpathSApply(x, "./Article/PublicationTypeList/PublicationType", xmlValue)
+  } else {
+    NA
+  }
+})
+
+ArticleTitle <- xpathSApply(pubmed, "//PubmedArticle/MedlineCitation", function(x) {
+  if (xpathSApply(x, "boolean(./Article/ArticleTitle)")) {
+    xpathSApply(x, "./Article/ArticleTitle", xmlValue)
+  } else {
+    NA
+  }
+})
+
+Date_Revised <- xpathSApply(pubmed, "//PubmedArticle/MedlineCitation", function(x) {
+  if (xpathSApply(x, "boolean(./DateRevised)")) {
+    xpathSApply(x, "././DateRevised", xmlValue)
+  } else {
+    NA
+  }
+})
+
+Date_Completed <- xpathSApply(pubmed, "//PubmedArticle/MedlineCitation", function(x) {
+  if (xpathSApply(x, "boolean(./DateCompleted)")) {
+    xpathSApply(x, "./DateCompleted", xmlValue)
+  } else {
+    NA
+  }
+})
+
+#Loading the library
+library(tidyverse)
+
+#Changing the fomat of Date completed and Date Revised to yyyy-mm-dd
+Date_Completed <- str_replace(Date_Completed,"(\\d{4})(\\d{2})(\\d{2})$","\\1-\\2-\\3")
+DateCompleted <- as.Date(Date_Completed)
+
+Date_Revised <- str_replace(Date_Revised,"(\\d{4})(\\d{2})(\\d{2})$","\\1-\\2-\\3")
+DateRevised <- as.Date(Date_Revised)
+
+NoofAuthors <- xpathSApply(pubmed, "//PubmedArticle/MedlineCitation", function(x) {
+  if (xpathSApply(x, "boolean(./Article/AuthorList)")) {
+    nrow(plyr::count(xpathSApply(x, "./Article/AuthorList/Author",xmlValue)))
+  } 
+  else {
+    NA
+  }
+})
+
+
+#PART 2
+#Journal Tibble
+medium <- xpathSApply(pubmed, "//PubmedArticle/MedlineCitation", function(x) {
+  if (xpathSApply(x, "boolean(./Article/Journal/JournalIssue)")) {
+    xpathSApply(x, "./Article/Journal/JournalIssue", xmlGetAttr, "CitedMedium")
+  } else {
+    NA
+  }
+})
+
+publication_season <- xpathSApply(pubmed, "//PubmedArticle/MedlineCitation", function(x) {
+  if (xpathSApply(x, "boolean(./Article/Journal/JournalIssue/PubDate/Season)")) {
+    xpathSApply(x, "./Article/Journal/JournalIssue/PubDate/Season", xmlValue)
+  } else {
+    NA
+  }
+})
+  
+publication_year <- xpathSApply(pubmed, '//PubmedArticle/MedlineCitation', function(x){
+  if (xpathSApply(x, "boolean(./Article/Journal/JournalIssue/PubDate/Year)")) {
+    xpathSApply(x, "./Article/Journal/JournalIssue/PubDate/Year", xmlValue)
+  } else {
+    NA
+  }
+})
+
+language1 <- xpathSApply(pubmed, "//PubmedArticle/MedlineCitation", function(x) {
+  if (xpathSApply(x, "boolean(./Article/Language)")) {
+    xpathSApply(x, "./Article/Language", xmlValue)
+  } else {
+    NA
+  }
+})
+#language1
+
+language <- sapply(1:length(language1), function(x) language1[[x]][1])
+
+#language1[[54]][2]
+
+# <- language1[1,]  
+#language
+
+journal_title <- xpathSApply(pubmed, "//PubmedArticle/MedlineCitation", function(x) {
+  if (xpathSApply(x, "boolean(./Article/Journal/Title)")) {
+    xpathSApply(x, "./Article/Journal/Title", xmlValue)
+  } else {
+    NA
+  }
+})
+
+ISSN_publication_year <- paste(ISSN, publication_year, sep = "_")
+
+publication <- data_frame(PMID, ISSN_publication_year, DateCompleted, DateRevised, NoofAuthors, PublicationType, ArticleTitle,  )
+View(publication)
+
+
+journal <- data_frame(ISSN, medium, ISSN_publication_year, publication_year, publication_season,  language, journal_title)
+journal <- journal %>%
+filter(ISSN!= "NA") 
+
+journal <- unique(journal)
+View(journal)
+
+#To check if the 
+#table(journal$ISSN_publication_year)
+
+```
+
+3. Create a line graph of the number of publications per year.
+```{r}
+#Calling libraries 
+library(ggplot2)
+library(plyr)
+```
+
+```{r}
+#Using Inner join to join Journal and Publication
+a <- merge(journal, publication, by="ISSN_publication_year")
+
+#group_by function here is used for grouping the publication by year and counting them. The filter has !is.na meaning that the NA values are removed
+b <- group_by(a, publication_year) %>%
+  summarise(count = n()) %>%
+  filter(!is.na(publication_year))
+b
+
+#Plotting the line graph using ggplot function
+ggplot(data = b, mapping = aes(x = publication_year, y = count)) +
+  geom_point() + geom_line(group=1, color = "blue") +  ggtitle("Line graph of number of publications per year") + xlab("Publication year") + ylab("Frequency/count") + theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+
+4. Create a histogram of the number of publication per journal.
+```{r}
+#Using merge function to inner join publication and journal
+a <- merge(publication, journal, by="ISSN_publication_year")
+
+#Grouping by the journal title and having a count 
+b <- group_by(a, journal_title) %>%
+  summarise(count = n()) 
+  #filter(!is.na(journal_title))
+b
+#plot(b, x = journal_title, y = count)
+
+#Selecting only the journal title
+c <- select(a, journal_title)
+c
+
+#Using ggplot to plot a histogram
+ggplot(c, aes(journal_title)) + geom_bar() + theme(axis.text.x = element_blank()) + xlab("Journal title") + ylab("Frequency/count") + ggtitle("Histogram of the number of publication per journal")
+
+```
+
+5.Find the article that had the most number of authors and list the article, journal, and number of authors.
+```{r}
+#Using the merge function to inner join publication and journal 
+a <- merge(publication, journal, by="ISSN_publication_year")
+
+#Arranging by No of Authors in a descending order and selecting the top row
+b <- select(a, ArticleTitle, journal_title, NoofAuthors)  %>%
+  arrange(desc(NoofAuthors)) %>%
+  head(1)
+b
+
+```
+
+6. Find the average number of authors for articles. Display a single number.
+```{r}
+#We use round function to round-off the average no of authors. And aso we use is.na to remove all the NA values.
+b <- round(select(publication,NoofAuthors) %>%
+     filter(!is.na(NoofAuthors)) %>%
+     summarise(Average = mean(NoofAuthors)))
+b
+
+```
+
+7. What is the shortest and the longest time periods between date completed and date revised. Display the time elapsed in days.
+```{r}
+#Calculating the difference between date revised and date completed
+time_difference <- (publication$DateRevised - publication$DateCompleted)
+#time_difference
+
+#Min difference between the date completed and date revised
+Min <- min(abs(time_difference), na.rm = T)
+Min
+#min <- min(time_difference[time_difference >= 0], na.rm = T)
+#min
+
+#Max difference between the date completed and date revised
+Max <- max(time_difference, na.rm = T)
+Max
+
+```
+
+8.  In how many different languages are the articles published in PubMed? Note that this will actually give an incorrect answer because the tibble only contains the first language of publication.
+```{r}
+#We use unique and calculate the number of languages
+length(unique(journal$language))
+
+```
+
+9. Using the XML data (not the tibbles created above), inspect the abstract text fields and find how many articles contained the words "in vitro", "drug resistance", "virus", "transmission", "clinical study" in any capitalization in any abstract section. Note that drug resistance could be spelled as "drug resistance" or "drug-resistance" or "drug resistant" or "drug resistent" -- use regular expression s to deal with the variation.
+```{r}
+?xpathSApply
+Abstract <- xpathSApply(pubmed, "//PubmedArticle/MedlineCitation", function(x) {
+  if (xpathSApply(x, "boolean(./Article/Abstract/AbstractText)")) {
+    xpathSApply(x, "./Article/Abstract/AbstractText", xmlValue, "Abstract")
+  } else {
+    NA
+  }
+})
+
+#To convert everything to lowercase
+a <- str_to_lower(Abstract)
+```
+
+```{r}
+#To calculate the number of "in vitro" in the Abstract 
+sum(str_detect(a, "in vitro"))
+```
+
+```{r}
+#To calculate the number of drug resistance/drug-resistance/drug resistant/drug resistent
+sum(str_detect(a, "drug[ |-]resist[ance|ence|ent]"))
+#sum(str_detect(a, "[drug resistance]|[drug-resistance]|[drug resistant]|[drug resistent]"))
+```
+
+```{r}
+#To calculate the number of "virus" in the Abstract 
+sum(str_detect(a, "virus"))
+```
+
+```{r}
+#To calculate the number of "transmission" in the Abstract 
+sum(str_detect(a, "transmission"))
+```
+
+```{r}
+#To calculate the number of "clinical study" in the Abstract 
+sum(str_detect(a, "clinical study"))
+```
+

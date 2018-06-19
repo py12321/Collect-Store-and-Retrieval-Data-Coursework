@@ -1,0 +1,254 @@
+---
+title: "R Notebook"
+output:
+  word_document: default
+  html_notebook: default
+  pdf_document: default
+---
+#Question 1
+Download the unemployment and education data files below and save the files to your working directory folder. Load both the unemployment data and the education data into R. Review the education data. Identify where variable names are actually values for a specific variable. Identify when multiple rows are data for the same entity. Identify when specific columns contain more than one atomic value. Tidy up the education data using spread, gather and separate.
+```{r}
+#Setting the directory
+getwd()
+setwd("C:/Users/prith/OneDrive/Desktop/Assignment 5/Data")
+#Loading the library
+library(tidyverse)
+
+#Loading the Education data
+education <- read_csv("1.csv", col_names = T, cols(fips = col_integer(), year = col_integer(), percent_measure = col_character(), percent = col_double(), county_state = col_character(), rural_urban_cont_code = col_integer(), description = col_character()))
+                       
+#Loading the unemployment data 
+unemployment <- read_csv("2.csv",col_names = T, cols(fips = col_integer(), year = col_integer(), percent_unemployed = col_double()))
+
+education
+unemployment
+
+#table(unemployment$year)
+#Some States and County have same meaning. For example AK - Alaska, for them rural_urban_cont_code is NA.
+tidy_education <- spread(education, key = percent_measure, value = percent) %>%
+separate(county_state, into = c("State","County"), extra = "merge")%>%
+  #filter(!is.na(rural_urban_cont_code)) %>%
+rename(percent_less_than_hs_diploma=`percent_less than_hs_diploma`)
+
+tidy_education
+```
+#Question 2
+Break apart the education data into three distinct tibbles. One tibble named education contains the education data, another tibble named fips, contains the fips number definition, and the third tibble named rural_urban_code contains the textual description of the 9 different urban to rural data descriptions. These three tibbles must be linked together to represent the relationships between the tibbles. For example, in the fips table each row represents the definition of a fips number (County, State). Each row in the education table will contain the educational attainment of a specific county. It also will contain a fips number since this data is specific to a county within a state. There are fips numbers for the state at large rather than a county -- omit those from the tibbles. Here's an entity-relationship diagram of the model:
+```{r}
+education <- transmute(tidy_education, rural_urban_cont_code, fips, year, percent_four_plus_years_college, percent_has_some_college, percent_hs_diploma, percent_less_than_hs_diploma) %>%
+  left_join(unemployment, by =c("fips", "year")) %>%
+  filter(!str_detect(fips,"000$")) %>%
+  #Row number to each row    
+  rowid_to_column(var = "RowID")
+education  
+
+#Not working
+#education1 <- merge(education, unemployment, by="fips", all.x=TRUE)
+
+fips <- group_by(tidy_education, fips, State, County) %>%
+  summarise()
+fips
+
+rural_urban_code <- group_by(tidy_education, rural_urban_cont_code, description) %>%
+  summarise() %>%
+  select(rural_urban_cont_code, description) %>%
+  filter(!is.na(rural_urban_cont_code))
+rural_urban_code 
+```
+
+#Question 3
+Answer the following questions about your tibbles: The fips column in the education table - is it a foreign or a primary key for the education tibble? What is the primary key for your education tibble? The rural_urban_code tibble should only contain 9 rows. What is its primary key?
+```{r}
+#The fips column in education table is a foreign key.
+#It refers to the fips column in fips table which is a primary key in that table.
+#The rural_urban code tibbl has rural_urban_cont_code as its primary key
+
+```
+
+
+#Problem 4 
+Write expressions to answer the following queries:
+1. In the year 1970, what is the percent of the population not attaining a high school diploma for the Nantucket county in Massachusetts? What about the year 2015?
+```{r}
+#education <- rename(education, percent_less_than_hs_diploma=`percent_less than_hs_diploma`)
+
+#Using merge function to inner join education and fips. It is joined using fips
+a <- merge(education, fips, by="fips")
+
+#Using filter function of dplyr to find out the percentage
+b <- select(a, year, State, County, percent_less_than_hs_diploma) %>%
+ filter(year == 1970, State == 'MA', County == 'Nantucket County')
+b
+
+#Using filter function of dplyr to find out the percentage
+c <- select(a, year, State, County, percent_less_than_hs_diploma) %>%
+filter(year == 2015, State == 'MA', County == 'Nantucket County')
+c
+```
+2. What is the average percentage not receiving a high school diploma for the counties in Alabama for the year 2015? Calculate the value, do not use the rate provided in the FipsEducation file.
+```{r}
+#Using merge function to inner join education and fips. It is joined using fips
+a <- merge(education, fips, by="fips")
+
+#Using mean function inside summarise to caluculate the average 
+b <- select(a, year, State, percent_less_than_hs_diploma) %>%
+  filter(year == 2015, State == 'AL') %>%
+  summarise(Average = mean(percent_less_than_hs_diploma))
+b
+```
+
+3. What is the average percentage of college graduates for the counties in the state of Alaska for the year 2015?
+```{r}
+#education <- rename(education, percent_less_than_hs_diploma=`percent_less than_hs_diploma`)
+
+#Using merge function to inner join education and fips. It is joined using fips
+a <- merge(education, fips, by="fips")
+
+#Using mean function inside summarise to caluculate the average
+b <- select(a, year, State, percent_four_plus_years_college) %>%
+     filter(year == 2015, State == 'AK') %>%
+     summarise(Average = mean(percent_four_plus_years_college))
+b
+```
+
+4. Determine the average percentage of population not attaining a high school diploma for the counties in Alabama for each year within the dataset. The result should return the calendar year and the average percentage not attaining a high school diploma for that year?
+```{r}
+#Using merge function to inner join education and fips. It is joined using fips
+a <- merge(education, fips, by="fips")
+
+#Using group_by to group by year
+b <-  group_by(a, year) %>%  
+  filter(State == 'AL') %>%
+  select(year, State, percent_less_than_hs_diploma) %>%
+  #Using mean function inside summarise to caluculate the average
+  summarise(Average = mean(percent_less_than_hs_diploma))
+b
+```
+
+5. What is the most common rural_urban code for the U.S. counties?
+```{r}
+#Using merge function to inner join education and fips. It is joined using fips
+a <- merge(education, fips, by="fips")
+
+#Using the summarise function to count and filter function to find the maximum
+b <- group_by(a, rural_urban_cont_code) %>%
+  summarise(count = n()) %>%
+  filter(count == max(count))
+b
+```
+
+6. Which counties have not been coded with a rural urban code? Return a result that contains two fields: County, State for the counties that have not been assigned a rural urban code. Do not return duplicate values in the result. Order the result alphabetically by state. What does this result set represent?
+```{r}
+
+filter(education, is.na(rural_urban_cont_code)) %>% 
+  inner_join(fips, by="fips") %>%
+  group_by(County, State) %>%
+  summarise() %>%
+  arrange(State)
+
+```
+
+7. What is the minimal percentage of college graduates for the counties in the state of Mississippi for the year 2015? What does the result represent?
+```{r}
+#Using merge function to inner join education and fips. It is joined using fips
+a <- merge(education, fips, by="fips")
+
+#Using the arrange function to sort by percent_four_plus_years_college
+b <- select(a, County, State, year, percent_four_plus_years_college) %>%
+  arrange(percent_four_plus_years_college) %>%
+  filter(year == 2015, State == 'MS') %>%
+  head(1)
+b
+```
+
+8. In the year 2015, which fip counties, are above the average unemployment rate? Provide the county name, U.S. state name and the unemployment rate in the result. Sort in descending order by unemployment rate.
+```{r}
+#Using merge function to inner join education and fips. It is joined using fips
+a <- merge(education, fips, by="fips")
+
+#In the filter function, we check if the percent_unemployed is greater than the mean. na.rm = T 
+b <- select(a, year, State, County, percent_unemployed) %>%
+    filter(year == 2015, percent_unemployed > mean(percent_unemployed, na.rm = T)) %>%
+    arrange(desc(percent_unemployed))
+b
+```
+
+9. In the year 2015, which fip counties in which U.S. states contain a higher percentage of unemployed citizens than the percentage of college graduates? List the county name and the state name. Order the result alphabetically by state.
+```{r}
+#Using merge function to inner join education and fips. It is joined using fips
+a <- merge(education, fips, by="fips")
+
+# filter function used to calculate if percent_unemployed is greater than percent_four_plus_years_college and is arranged by State
+b <- filter(a, year == 2015, percent_unemployed > percent_four_plus_years_college) %>%
+    select(fips, State, County) %>%
+  arrange(State)
+b
+```
+
+10. List the county, U.S. state and year that contains the highest percentage of college graduates in this dataset?
+```{r}
+#Using merge function to inner join education and fips. It is joined using fips
+a <- merge(education, fips, by="fips")
+b <- filter(a, percent_four_plus_years_college == max(percent_four_plus_years_college)) %>%
+  select(County, State, year, percent_four_plus_years_college) 
+  #group_by(percent_four_plus_years_college)
+c <- select(a, County, State, year, percent_four_plus_years_college) %>%
+  arrange(desc(percent_four_plus_years_college)) %>%
+  head(1)
+c     
+b
+```
+
+
+#Problem 5
+This is an open-ended question: explore the unemployment rate and the percent not attaining a high school diploma over the time period in common for the two datasets. What can you discover? Create at least one plot, chart, or graph that supports your discovery.
+```{r}
+#Using merge function to inner join education and fips. It is joined using fips
+a <- merge(education, fips, by="fips")
+
+ggplot(data = a, mapping = aes(x = percent_less_than_hs_diploma, y = percent_unemployed)) +
+  geom_point() + geom_line() + ggtitle("Percent unemployed vs Percent not attaining a high school diploma") + xlab("Percent less than a high school diploma") + ylab("Percent unemployed")
+
+#Checking the correlation between the variables.
+cor(x = a$percent_less_than_hs_diploma, y = a$percent_unemployed, use="complete.obs")
+#Correlation si 0.4831 
+```
+
+#Problem 6 
+1. Load the XML document at the URL (https://www.senate.gov/general/contact_information/senators_cfm.xml) directly into a data frame.
+2. Write a function senatorName(state) that returns the names of the senators for a given state, i.e., the function takes a state as an argument and returns the names of the senators for that state in a vector. The names must be in the form last, first, e.g., Lamar, Alexander with any additional name elements such as III or Jr. or Sr. removed.
+If you get errors while loading the XML file, be sure to use the RCurl package. See this post for details.
+```{r}
+#Loading the RCurl and XML libraries
+library(RCurl)
+library(XML)
+#Loading the URL to a variable named URL
+URL <- "https://www.senate.gov/general/contact_information/senators_cfm.xml"
+#getURL function is used to download a URL
+data <- getURL(URL)
+#xmlToDataFrame is used to extract data from XML file to a data frame
+senate_data <- xmlToDataFrame(data)
+
+senate_data
+
+#Creating a function senatorName
+senatorName <- function(state1){
+    name_of_state <- senate_data %>%
+    filter(state == state1) %>% 
+    separate(first_name, c("first", "other"), sep = " ", extra = "drop", fill = "right") %>% 
+    unite(name, last_name, first, sep = ", ") %>% 
+    select(name)
+ 
+  a <- as.vector(name_of_state$name)
+  return(a)
+}
+
+#Calling the function senatorName and passing Colorado state in it
+senatorName("CO")
+
+
+```
+
+
+
+
