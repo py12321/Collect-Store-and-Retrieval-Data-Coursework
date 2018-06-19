@@ -1,0 +1,178 @@
+---
+title: "R Notebook"
+output:
+  word_document: default
+  html_notebook: default
+---
+
+Question 1 (10 Points)
+
+1. Using the built-in dataset USArrests in R (containing statistics about violent crime rates in the US States), create the following visualization using ggplot2. See the resources below for help.
+```{r}
+library(ggplot2)
+library(tidyverse)
+head(USArrests)
+#font_import()
+#loadfonts(device = "win")
+ggplot(data = USArrests, mapping = aes(x = UrbanPop, y = Assault, color = Murder)) +
+  geom_point() +
+  geom_smooth(method = 'loess') + ggtitle("Assaults and Murder based on Population") + xlab("Urban Population") + ylab("Assault") + theme(plot.title = element_text(family = "Arial", face="bold", size=15))
+```
+
+Question 2 (10 Points)
+
+1. For the same data set as in Question 1, determine which states are outliers in terms of assaults. Outliers, for the sake of this question, are defined as values that are more than 1.5 standard deviations from the mean.
+```{r}
+USArrests1 <- USArrests
+USArrests1$z_score <- abs((mean(USArrests1$Assault) - USArrests1$Assault)/(sd(USArrests1$Assault))) 
+
+USArrests1[which(USArrests1$z_score > 1.5), ]
+
+```
+
+2. For the same dataset, is there a correlation between murder and assault, i.e., as one goes up, does the other statistic as well? Comment on the strength of the correlation. Calculate the Pearson coefficient of correlation in R.
+```{r}
+
+cor(x=USArrests1$Assault, y=USArrests1$Murder, method="pearson")
+
+```
+
+Question 3 (10 Points)
+
+1. Download the data set surveys.csv and load it into R using surveys <- read.csv("surveys.csv", header = T, sep = ","). This loads the data into the surveys data frame. 
+```{r}
+getwd()
+setwd("C:/Users/prith/OneDrive/Desktop/CSR Assignments")
+
+surveys <- read.csv("surveys (1).csv", header = T, sep = ",")
+head(surveys)
+```
+
+2. Calculate the mean length of the hind foot for the species.
+```{r}
+mean(surveys$hindfoot_length, na.rm = T)
+```
+
+3. Calculate the proportion of male and female species as a percentage, e.g., 43% male, 57% female.
+```{r}
+table(surveys$sex)
+Male <- length( which(surveys$sex == 'M'))
+Female <- length(which(surveys$sex == 'F'))
+M_Proportion <- (Male/(Male+Female))*100
+F_Proportion <- (Female/(Male+Female))*100
+M_Proportion
+F_Proportion
+```
+
+```{r}
+#The proportion of Males is 52.50% and the proportion of females is 47.49%
+```
+
+
+4. Create a scatter plot of hind foot length versus weight. Comment on any correlation that is visually apparent, then calculate the correlation coefficient and comment on the strength of the correlation.
+
+```{r}
+ggplot(data = surveys, mapping = aes(x = surveys$hindfoot_length, y = surveys$weight)) + geom_point() + geom_smooth(method = 'loess') + xlab("Hindfoot Length") + ylab("Weight")
+
+cor(x=surveys$hindfoot_length, y=surveys$weight, method="pearson", use = "complete.obs")
+
+#The strength of the correlation is moderate positive relationship
+
+```
+
+Question 4 (30 Points)
+
+1. Extract the survey observations for the first three months of 1990 using the filter() function using the dyplr package.
+```{r}
+d1 <- filter(surveys, year==1990 & month==c(1:3))
+
+```
+```{r}
+# The filter() is used to limit the data to year 1990 and months from 1 to 3
+#head() is used to display only the first 10 rows of data.
+```
+
+2. Sort the 1990 winter surveys data by descending order of record ID, then by ascending order of weight.
+```{r}
+
+  arrange(d1, desc(record_id)) %>%
+  arrange(weight) 
+  
+```
+
+3. Extract the record_id, sex and weight of all "Reithrodontomys Montanus" (RO).
+```{r}
+
+  select(surveys, record_id, sex, weight, species_id) %>%
+  filter(species_id =='RO')
+```
+
+4. What is the average weight and hindfoot length of "Dipodomys Merriami" (DM) observed in each month (irrespective of the year). Make sure to exclude NA values.
+```{r}
+surveys %>%
+group_by(month) %>%
+filter(species_id=="DM") %>%
+summarise(average_weight=mean(weight, na.rm = T),
+average_hindfoot= mean(hindfoot_length, na.rm = T))
+```
+
+5. Determine the number of cases (observations) by species observed in the winter of 1990.
+```{r}
+
+filter(surveys, year==1990 & month==c(1:3)) %>%
+  count(species_id)
+  
+```
+
+Question 5 (40 Points)
+
+1. Install the gapminder package in R and load the gapminder dataset. The gapminder data is not a data frame, you need to use the as.data.frame() function to convert it to one. The fields on the data frame are the following:
+  Country: the country the statistics are collected for
+  Continient: the continent where the country resides
+  Year: the year when the statistics were collected
+  LifeExp: the life expectancy for a person living in that country in that particular year
+  pop : the population for the country in that particular year
+  gdpperCap: the GDP per capita (person) GDP is gross domestic product, the total economic output of a country, i.e., the amount of money a country   makes. GDP per capita is the total output divided by the number of people in the population. This measure provides an average output of each   person, i.e., the average amount of money each person makes.
+```{r}
+library(gapminder)
+gapminder <- as.data.frame(gapminder)
+```
+
+2. Create a dataframe named gapminder_df and mutate it to contain a column that contains the gross domestic product for each row in the data frame.
+```{r}
+gapminder_df <- mutate(gapminder,GDP=pop*gdpPercap)
+head(gapminder_df,10)
+```
+
+3. Calculate the Mean GDP for Cambodia for the years within the dataset.
+```{r}
+gapminder %>%
+filter(country=="Cambodia") %>%
+group_by(country) %>%
+summarise(MeanGDP=mean(gdpPercap))
+```
+
+4. Find the year with the maximum life expectancy for countries in Asia and arrange them in descending order by year,  The result should contain the country's name, the year and the life expectancy.
+```{r}
+gapminder %>%
+filter(continent=="Asia") %>%
+select(country,year,lifeExp) %>%
+group_by(country) %>%
+filter(lifeExp==max(lifeExp)) %>%
+arrange(desc(year))
+```
+
+5. Count the number of observations per continent.
+```{r}
+gapminder %>%
+count(continent)
+```
+
+6. Compute the average and median life expectancy and GDP per capita by continent for the years 1952 and 2007.  Should we be optimistic given the results?
+```{r}
+gapminder_df %>%
+filter(year==1952|year==2007) %>%
+group_by(continent,year) %>%
+summarise(AverageLifeExp=mean(lifeExp),Median=median(lifeExp),MeanGDP=mean(GDP))
+```
+The average and median life expectancy and GDP per capita by continent all show a big improvement for the year 2007 in comparision to 1952 which is a very positive change.

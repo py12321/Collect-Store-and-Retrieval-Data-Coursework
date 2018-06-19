@@ -1,0 +1,75 @@
+---
+title: "R Notebook"
+output:
+  word_document: default
+  html_notebook: default
+---
+1. Load the data into an appropriate data object of your choice (data frame or tibble). Note that the data file is compressed so you need to determine and appropriate way to uncompress the file as you read it (do not uncompress the file in your operating system). See the resources below to view an article that explains various ways to read compressed files.
+```{r}
+#Checking the directory
+getwd()
+#Setting the directory
+setwd("C:/Users/prith/Downloads/CSR Assignments/Assignment 3")
+#Loading the data from a zipped file
+data <- read.table(unz("bird_strikes.zip", "Bird Strikes.csv"), header=T, quote="\"", sep=",", fill = T, stringsAsFactors = F)
+#Checking top 10 rows
+head(data, n = 10)
+```
+
+2. Construct a histogram (frequency plot) of bird strikes by flight phase (Climb, Approach, etc.)
+```{r}
+#Loading the ggplot2 package
+library(ggplot2)
+library(tidyverse)
+data1 <- data
+
+dataphase <- data_frame(Flightphase = data1$When..Phase.of.flight) %>% filter(Flightphase !="")
+freq_phases <- table(dataphase) #Shows the total number of strikes during each phase of flight
+
+#Histogram constructed using the ggplot2 package
+ggplot(data = dataphase, mapping = aes(x= Flightphase)) + geom_bar(stat = "count") + ggtitle("Histogram (frequency plot) of bird strikes by flight phase") + xlab("Phase of flight") + ylab("Frequency of Bird Strikes") 
+
+```
+
+3. Which airlines had the most bird strikes?
+```{r}
+#Loading the tidyverse library
+library(tidyverse)
+#Selecting the 'Aircraft..Airline.Operator' column from the data
+x <- select(data, Airline = Aircraft..Airline.Operator) %>%
+#Using the group by statement
+group_by(Airline) %>%
+#Removing all the UNKNOWN variables
+filter(Airline!="UNKNOWN") %>%
+#n() is the count
+summarise(Bird_Strikes = n()) %>%  
+#Using the filter statement to find out the maximum value
+filter(Bird_Strikes==max(Bird_Strikes)) 
+x
+```
+
+
+4. How many bird strikes were there during the "Climb" phase of the flight?
+```{r}
+#Group by statement is used to calculate the 
+x <- group_by(data, Phase=When..Phase.of.flight) %>%
+summarise(Bird_Strikes = n()) %>%  
+filter(Phase=="Climb") 
+x
+```
+
+5. How many bird strikes were above 5,000 ft?
+```{r}
+#Checking the class of "Feet.above.ground"
+#class(data$Feet.above.ground)
+#Entering the original data into a new dataframe data1
+data1 <- data
+#Removing the commas from the "Feet.above.ground" column, converting the row to numeric and overwritting it on the data1$Feet.above.ground column
+data1$Feet.above.ground <- as.numeric(gsub(",","",data$Feet.above.ground))
+#Using Pipes, select statement, filter statement we find the bird strikes above 5000ft  
+y <-  select(data1, feet = Feet.above.ground) %>%  
+  filter(feet>5000) %>%
+  count()
+y
+
+```
